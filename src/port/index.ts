@@ -31,7 +31,7 @@ export abstract class GraphDatabasePort {
     // abstract readNodes(selector: TNodeSelector): Promise<Node[]>
 
     abstract patchNode(id: string, delta: TNodeDelta): Promise<Node | undefined>
-    // abstract patchNodes(selector: TNodeSelector, delta: {labels?: TNodeLabels, properties?: TNodeProperties}): Promise<Node[]>
+    // abstract patchNodes(selector: TNodeSelector, delta: TNodeDelta): Promise<Node[]>
 
     // Note: must also delete connected links.
     abstract deleteNode(id: string) : Promise<Node | undefined>
@@ -41,12 +41,15 @@ export abstract class GraphDatabasePort {
     // abstract setLinks(links: TLink[]) : Promise<TLink[]>
 
     abstract readLink(id: string) : Promise<Link | undefined>
+    // abstract readLinks(selector: TLinkSelector): Promise<TLink[]>
 
     abstract patchLink(id: string, delta: TLinkDelta): Promise<Link>
+    // abstract patchLinks(selector: TLinkSelector, delta: TLinkDelta): Promise<Link[]>
 
     abstract deleteLink(id: string): Promise<Link | undefined>
+    // abstract deleteLinks(selector: TLinkSelector): Promise<Link[]>
 
-    // abstract queryGraph(query?: TCypherQuery): Promise<Graph>
+    abstract queryGraph(query?: TCypherQuery): Promise<Graph>
 
     abstract checkNodeExists(id: string) : Promise<boolean>
     abstract checkLinkExists(id: string) : Promise<boolean>
