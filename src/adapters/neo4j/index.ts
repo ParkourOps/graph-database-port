@@ -7,6 +7,7 @@ import { stringifyLabels, stringifyProps } from "../../utils/cypher-string-funct
 import {generateNodeId, generateLinkId} from "../../utils/random-gen-functs"
 import { TNodeDelta } from "../../port/schema/node";
 import { Link } from "../../port/classes/link";
+import { TLinkDelta } from "../../port/schema/link";
 
 type ManagedTransactionWork<T> = (tx: ManagedTransaction) => Promise<T> | T;
 
@@ -263,6 +264,41 @@ export class Neo4jAdapter extends GraphDatabasePort {
         if (!rawLink || !rawSource || !rawTarget) return;
         // create and return deleted link
         return rawBeforeDelete;
+    }
+
+    async patchLink(id: string, delta: TLinkDelta): Promise<Link> {
+        const props = delta.properties ?? {};
+        props._id_ = id;
+        const linkPropsStr = stringifyProps(props);
+        // create query
+        let query = `MATCH (a)-[r {_id_:'${id}'}]->(b) `;
+        if (delta.label) {
+            // since we can't change label, we have to create a new link and delete the old one
+            query += `DELETE r CREATE (a)-[r_new:${delta.label} ${linkPropsStr}]->(b) WITH a, r_new as r, b `;
+        } else {
+            query += `SET r = ${linkPropsStr} `;
+        }
+        query += `RETURN a, r, b`;
+        // execute query
+        const queryResult = await this.#writeQuery(({
+            text: query
+        }));
+        // get raw
+        const rawLink = queryResult.records?.[0]?.get("r");
+        const rawSource = queryResult.records?.[0]?.get("a");
+        const rawTarget = queryResult.records?.[0]?.get("b");        
+        // parse
+        const returnedLink = parseRawLinkData(rawLink);
+        const returnedSource = parseRawNodeData(rawSource);
+        const returnedTarget = parseRawNodeData(rawTarget);
+        // create and return link
+        return new Link({
+            id: returnedLink.properties._id_,
+            label: returnedLink.type,
+            properties: returnedLink.properties,
+            source: returnedSource.properties._id_,
+            target: returnedTarget.properties._id_
+        });
     }
 
     async checkNodeExists(id: string) {
