@@ -16,16 +16,14 @@ export const SLink = SLinkBase.merge(z.object({
     target: SNodeId
 }));
 
-// export const SReferencedLink = SLinkBase.merge(z.object({
-//     source: SNode,
-//     target: SNode
-// }));
+export const SReferencedLink = SLinkBase.merge(z.object({
+    source: SNode,
+    target: SNode
+}));
 
 export type TLinkId = z.infer<typeof SLinkId>;
 export type TLinkLabel = z.infer<typeof SLinkLabel>;
 export type TLinkProperties = z.infer<typeof SLinkProperties>;
 export type TLinkBase = z.infer<typeof SLinkBase>;
 export type TLink = z.infer<typeof SLink>;
-// export type TReferencedLink = z.infer<typeof SReferencedLink>;
-
-export type TLinkUpdateSpec = Partial<Omit<TLinkBase, "id" | "label">>;
+export type TReferencedLink = z.infer<typeof SReferencedLink>;

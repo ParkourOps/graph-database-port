@@ -16,5 +16,8 @@ export type TNodeId = z.infer<typeof SNodeId>;
 export type TNodeLabels = z.infer<typeof SNodeLabels>;
 export type TNodeProperties = z.infer<typeof SNodeProperties>;
 export type TNode = z.infer<typeof SNode>;
+export type TNodeDelta = {
+    labels?: TNodeLabels,
+    properties?: TNodeProperties
+};
 
-export type TNodeSpec = Partial<Omit<TNode, "id">>;
