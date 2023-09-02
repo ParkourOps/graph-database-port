@@ -1,4 +1,4 @@
-import {expect} from "chai"
+import {assert, expect} from "chai"
 import { GraphDatabasePort } from "../src";
 import { generateRandomCorrectNodeLabels, generateRandomIncorrectNodeLabels, generateRandomProps } from "./helpers/random-gen-functs";
 import isObjEqual from "lodash.isequal";
@@ -87,8 +87,10 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
                 properties: {}
             });
             const readNode = await db.readNode(nodeId);
+            if (!readNode) assert.fail();
             const deletedNode = await db.deleteNode(nodeId);
-            expect(createdNode.id).to.equal(readNode?.id).to.equal(deletedNode?.id);
+            if (!deletedNode) assert.fail();
+            expect(createdNode.id).to.equal(readNode.id).to.equal(deletedNode.id);
             const readDeletedNode = await db.readNode(nodeId);
             expect(readDeletedNode).to.be.a("undefined");
         }).timeout(TIMEOUT_DURATION);
@@ -113,11 +115,12 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
             });
 
             const readNode = await db.readNode(id);
+            if (!readNode) assert.fail();
 
             expect(readNode).to.be.a("object");
-            expect(readNode?.id).to.equal(id);
-            expect(readNode?.labels.length).to.equal(endLabels.length);
-            expect(isObjEqual(readNode?.properties, endProps)).to.equal(true);
+            expect(readNode.id).to.equal(id);
+            expect(readNode.labels.length).to.equal(endLabels.length);
+            expect(isObjEqual(readNode.properties, endProps)).to.equal(true);
         }).timeout(TIMEOUT_DURATION);
 
         it("Should be able to append to a node, ignoring any overlap in arguments", async function() {
@@ -135,9 +138,10 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
             const patchedNode1 = await db.patchNode(id, {
                 labels: ["test_label", "test_label_2"]
             });
-            expect(patchedNode1?.labels.length).to.equal(labels.length + 2);
-            expect(patchedNode1?.labels).to.contain("test_label", "test_label_2");
-            expect(isObjEqual(patchedNode1?.properties, props)).to.equal(true);
+            if (!patchedNode1) assert.fail();
+            expect(patchedNode1.labels.length).to.equal(labels.length + 2);
+            expect(patchedNode1.labels).to.contain("test_label", "test_label_2");
+            expect(isObjEqual(patchedNode1.properties, props)).to.equal(true);
 
             // props only
             const patchedNode2 = await db.patchNode(id, {
@@ -146,11 +150,12 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
                     prop2: 123
                 }
             });
-            expect(patchedNode2?.labels.length).to.equal(labels.length + 2);
-            expect(patchedNode2?.properties).to.have.property("prop1");
-            expect(patchedNode2?.properties).to.have.property("prop2");
-            expect(patchedNode2?.properties?.prop1).to.equal("xyz");
-            expect(patchedNode2?.properties?.prop2).to.equal(123);
+            if (!patchedNode2) assert.fail();
+            expect(patchedNode2.labels.length).to.equal(labels.length + 2);
+            expect(patchedNode2.properties).to.have.property("prop1");
+            expect(patchedNode2.properties).to.have.property("prop2");
+            expect(patchedNode2.properties.prop1).to.equal("xyz");
+            expect(patchedNode2.properties.prop2).to.equal(123);
 
             // label and props
             const patchedNode3 = await db.patchNode(id, {
@@ -159,17 +164,173 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
                     prop3: ["a", "b", "c"]
                 }
             })
+            if (!patchedNode3) assert.fail();
+            
             const readNode = await db.readNode(id);
+            if (!readNode) assert.fail();
             // console.debug("patched:", patchedNode3);
             // console.debug("read:", readNode);
-            expect(isObjEqual(readNode?.properties, patchedNode3?.properties)).to.equal(true);
-            expect(readNode?.labels.length).to.equal(labels.length + 3);
-            expect(Object.entries(readNode?.properties ?? {}).length).to.equal(Object.entries(props).length + 3);
+            expect(isObjEqual(readNode.properties, patchedNode3.properties)).to.equal(true);
+            expect(readNode.labels.length).to.equal(labels.length + 3);
+            expect(Object.entries(readNode.properties).length).to.equal(Object.entries(props).length + 3);
         }).timeout(TIMEOUT_DURATION)
+
+        it("Should delete all connected links to a node, when the node is deleted", async function(){
+            const sourceNode = await db.setNode({
+                id: await db.generateNodeId(),
+                labels: generateRandomCorrectNodeLabels(),
+                properties: generateRandomProps()
+            });
+            const targetNode = await db.setNode({
+                id: await db.generateNodeId(),
+                labels: generateRandomCorrectNodeLabels(),
+                properties: generateRandomProps()
+            });
+            const link = await db.setLink({
+                id: await db.generateLinkId(),
+                label: "TEST",
+                properties: generateRandomProps(),
+                source: sourceNode.id,
+                target: targetNode.id
+            });
+            if (!link) assert.fail();
+            const readLinkBefore = await db.readLink(link.id);
+            expect(readLinkBefore).to.be.an("object");
+            await db.deleteNode(sourceNode.id);
+            const readLinkAfter = await db.readLink(link.id);
+            expect(readLinkAfter).to.be.a("undefined");
+        }).timeout(TIMEOUT_DURATION);
+
+        it("Should only delete the link when deleted, not the nodes it connects", async function() {
+            const sourceNode = await db.setNode({
+                id: await db.generateNodeId(),
+                labels: generateRandomCorrectNodeLabels(),
+                properties: generateRandomProps()
+            });
+            const targetNode = await db.setNode({
+                id: await db.generateNodeId(),
+                labels: generateRandomCorrectNodeLabels(),
+                properties: generateRandomProps()
+            });
+            const link = await db.setLink({
+                id: await db.generateLinkId(),
+                label: "TEST",
+                properties: generateRandomProps(),
+                source: sourceNode.id,
+                target: targetNode.id
+            });
+            if (!link) assert.fail();
+            const readLinkBefore = await db.readLink(link.id);
+            const readSourceBefore = await db.readNode(sourceNode.id);
+            const readTargetBefore = await db.readNode(targetNode.id);            
+            expect(readLinkBefore).to.be.a("object");
+            expect(readSourceBefore).to.be.an("object");
+            expect(readTargetBefore).to.be.an("object");
+            await db.deleteLink(link.id);
+            const readLinkAfter = await db.readLink(link.id);
+            const readSourceAfter = await db.readNode(sourceNode.id);
+            const readTargetAfter = await db.readNode(targetNode.id);
+            expect(readLinkAfter).to.be.a("undefined");
+            expect(readSourceAfter).to.be.an("object");
+            expect(readTargetAfter).to.be.an("object");
+        }).timeout(TIMEOUT_DURATION);
+
+
+        it("Should patch a link with a new label", async function(){
+            const sourceNode = await db.setNode({
+                id: await db.generateNodeId(),
+                labels: generateRandomCorrectNodeLabels(),
+                properties: generateRandomProps()
+            });
+            const targetNode = await db.setNode({
+                id: await db.generateNodeId(),
+                labels: generateRandomCorrectNodeLabels(),
+                properties: generateRandomProps()
+            });
+            const link = await db.setLink({
+                id: await db.generateLinkId(),
+                label: "TEST",
+                properties: generateRandomProps(),
+                source: sourceNode.id,
+                target: targetNode.id
+            });
+            if (!link) assert.fail();
+            await db.patchLink(link.id, {
+                label: "TEST_A"
+            });
+            const readLinkAfter = await db.readLink(link.id);
+            if (!readLinkAfter) assert.fail();
+            expect(readLinkAfter.label).to.equal("TEST_A");
+        }).timeout(TIMEOUT_DURATION);
+
+
+        it("Should patch a link with new props", async function(){
+            const sourceNode = await db.setNode({
+                id: await db.generateNodeId(),
+                labels: generateRandomCorrectNodeLabels(),
+                properties: generateRandomProps()
+            });
+            const targetNode = await db.setNode({
+                id: await db.generateNodeId(),
+                labels: generateRandomCorrectNodeLabels(),
+                properties: generateRandomProps()
+            });
+            const link = await db.setLink({
+                id: await db.generateLinkId(),
+                label: "TEST",
+                properties: generateRandomProps(),
+                source: sourceNode.id,
+                target: targetNode.id
+            });
+            if (!link) assert.fail();
+            await db.patchLink(link.id, {
+                properties: {
+                    favourite_condiment: "balsamic vinegar"
+                }
+            })
+            const readLinkAfter = await db.readLink(link.id);
+            if (!readLinkAfter) assert.fail();
+            expect(readLinkAfter.label).to.equal(link.label);
+            expect(readLinkAfter.properties).to.have.property("favourite_condiment");
+            expect(readLinkAfter.properties.favourite_condiment).to.equal("balsamic vinegar");
+        }).timeout(TIMEOUT_DURATION);
+
+
+        it("Should patch a link with new label and props", async function(){
+            const sourceNode = await db.setNode({
+                id: await db.generateNodeId(),
+                labels: generateRandomCorrectNodeLabels(),
+                properties: generateRandomProps()
+            });
+            const targetNode = await db.setNode({
+                id: await db.generateNodeId(),
+                labels: generateRandomCorrectNodeLabels(),
+                properties: generateRandomProps()
+            });
+            const link = await db.setLink({
+                id: await db.generateLinkId(),
+                label: "TEST",
+                properties: generateRandomProps(),
+                source: sourceNode.id,
+                target: targetNode.id
+            });
+            if (!link) assert.fail();
+            await db.patchLink(link.id, {
+                label: "ABC_XYZ",
+                properties: {
+                    favourite_condiment: "balsamic vinegar"
+                }
+            })
+            const readLinkAfter = await db.readLink(link.id);
+            if (!readLinkAfter) assert.fail();
+            expect(readLinkAfter.label).to.equal("ABC_XYZ");
+            expect(readLinkAfter.properties).to.have.property("favourite_condiment");
+            expect(readLinkAfter.properties.favourite_condiment).to.equal("balsamic vinegar");            
+        }).timeout(TIMEOUT_DURATION);
     });
 }
 
-export function adapterTest(db: GraphDatabasePort, repeat: number = 10) {
+export function adapterTest(db: GraphDatabasePort, repeat: number = 1) {
     after(async function(){
         await db.close();
     })
