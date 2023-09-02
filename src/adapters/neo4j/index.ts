@@ -140,16 +140,12 @@ export class Neo4jAdapter extends GraphDatabasePort {
         const rawBeforeDelete = await this.readNode(id);
         if (!rawBeforeDelete) return;
         const queryResult = await this.#writeQuery({
-            text: `MATCH (n {_id_:'${id}'}) DELETE n RETURN n`
+            text: `MATCH (n {_id_:'${id}'}) OPTIONAL MATCH ()-[r]-(n) DELETE n, r RETURN n`
         });
         const raw = queryResult.records?.[0]?.get("n");
         if (!raw) return;
-        const node = parseRawNodeData(rawBeforeDelete);
-        return new Node({
-            id: node.properties._id_,
-            labels: node.labels,
-            properties: node.properties                
-        });     
+        // create and return deleted node
+        return rawBeforeDelete;
     }
 
     async readNode(id: string): Promise<Node | undefined> {
@@ -252,6 +248,23 @@ export class Neo4jAdapter extends GraphDatabasePort {
         })
     }
     
+    async deleteLink(id: string): Promise<Link | undefined> {
+        // get link before deletion
+        const rawBeforeDelete = await this.readLink(id);
+        if (!rawBeforeDelete) return;
+        // generate query
+        const queryResult = await this.#writeQuery({
+            text: `MATCH (a)-[r {_id_:'${id}'}]->(b) DELETE r RETURN a, r, b`
+        });
+        // get raw
+        const rawLink = queryResult.records?.[0]?.get("r");
+        const rawSource = queryResult.records?.[0]?.get("a");
+        const rawTarget = queryResult.records?.[0]?.get("b");
+        if (!rawLink || !rawSource || !rawTarget) return;
+        // create and return deleted link
+        return rawBeforeDelete;
+    }
+
     async checkNodeExists(id: string) {
         const node = await this.readNode(id);
         return (!!node);
