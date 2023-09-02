@@ -2,9 +2,11 @@ import { GraphDatabasePort, Node } from "../../port"
 import neo4j, { RecordShape, Session, ManagedTransaction, Driver } from "neo4j-driver";
 import { TransactionConfig } from "neo4j-driver-core";
 import { TGraphDatabaseResultSpec, createGraphDatabaseErrorResult } from "../../port/schema/db-result";
-import { SNeo4jNode } from "./schema";
+import { SNeo4jLink, SNeo4jNode } from "./schema";
 import { stringifyLabels, stringifyProps } from "../../utils/cypher-string-functs";
-import {generateNodeId} from "../../utils/random-gen-functs"
+import {generateNodeId, generateLinkId} from "../../utils/random-gen-functs"
+import { TNodeDelta } from "../../port/schema/node";
+import { Link } from "../../port/classes/link";
 
 type ManagedTransactionWork<T> = (tx: ManagedTransaction) => Promise<T> | T;
 
@@ -14,13 +16,28 @@ type Query = {
 }
 
 function parseRawNodeData(n?: unknown) {
-    if (!n) {
-        throw GraphDatabasePort.errors.nodeNotFound;
-    }
+    if (!n) throw GraphDatabasePort.errors.nodeFetchFail;
     else {
         const parseResult = SNeo4jNode.safeParse(n);
         if (!parseResult.success) {
+            console.error("Failed to parse node:", n);
+            console.error(parseResult.error);
             throw GraphDatabasePort.errors.nodeParseFail;
+        }
+        else {
+            return parseResult.data;
+        }
+    }
+}
+
+function parseRawLinkData(l?: unknown) {
+    if (!l) throw GraphDatabasePort.errors.linkFetchFail;
+    else {
+        const parseResult = SNeo4jLink.safeParse(l);
+        if (!parseResult.success) {
+            console.error("Failed to parse link:", l);
+            console.error(parseResult.error);
+            throw GraphDatabasePort.errors.linkParseFail;
         }
         else {
             return parseResult.data;
@@ -62,7 +79,8 @@ export class Neo4jAdapter extends GraphDatabasePort {
             return await session.executeWrite((tx)=>tx.run<TReturn>(query), config);
         }
         catch (e) {
-            throw e;
+            console.error(e);
+            throw GraphDatabasePort.errors.writeError;
         }
         finally {
             await session.close();
@@ -71,204 +89,195 @@ export class Neo4jAdapter extends GraphDatabasePort {
     }
 
     async #readQuery<TReturn extends RecordShape>(query: Query, config?: TransactionConfig) {
+        if (this.#closed) {
+            throw GraphDatabasePort.errors.connectionClosed 
+        }
         const session = this.#createNewSession();
         try {
             return await session.executeRead((tx)=>tx.run<TReturn>(query), config);
         }
         catch (e) {
-            throw e; 
+            console.error(e);
+            throw GraphDatabasePort.errors.readError;
         }
         finally {
             await session.close();
             console.debug("session closed");
         }
     }
+
+    async setNode(node: { id: string; labels: string[]; properties: Record<string, unknown>; }): Promise<Node> {
+        const nodeLabelsStr = stringifyLabels(node.labels);
+        node.properties._id_ = node.id;
+        const nodePropsStr = stringifyProps(node.properties);
+        // create query
+        const exists = await this.checkNodeExists(node.id);
+        let query = "";
+        if (!exists) {
+            console.debug("creating new");
+            query = `CREATE (n${nodeLabelsStr} ${nodePropsStr}) RETURN n`;
+        } else {
+            console.debug("replacing old");
+            query = `MATCH (n {_id_:'${node.id}'}) `
+                        + `CALL apoc.create.removeLabels(n, labels(n)) YIELD node AS m `
+                        + `SET m${nodeLabelsStr} `
+                        + `SET m = ${nodePropsStr}`
+                        + `RETURN m as n`
+        }
+        // execute query
+        const queryResult = await this.#writeQuery(({
+            text: query
+        }));
+        const returnedNode = parseRawNodeData(queryResult.records?.[0]?.get("n"));
+        return new Node({
+            id: returnedNode.properties._id_,
+            labels: returnedNode.labels,
+            properties: returnedNode.properties            
+        });
+    }
+
+    async deleteNode(id: string): Promise<Node | undefined> {
+        const rawBeforeDelete = await this.readNode(id);
+        if (!rawBeforeDelete) return;
+        const queryResult = await this.#writeQuery({
+            text: `MATCH (n {_id_:'${id}'}) DELETE n RETURN n`
+        });
+        const raw = queryResult.records?.[0]?.get("n");
+        if (!raw) return;
+        const node = parseRawNodeData(rawBeforeDelete);
+        return new Node({
+            id: node.properties._id_,
+            labels: node.labels,
+            properties: node.properties                
+        });     
+    }
+
+    async readNode(id: string): Promise<Node | undefined> {
+        const queryResult = await this.#readQuery({
+            text: `MATCH (n {_id_:'${id}'}) RETURN n`
+        });
+        const raw = queryResult.records?.[0]?.get("n");
+        if (!raw) return;
+        const node = parseRawNodeData(raw);
+        return new Node({
+            id: node.properties._id_,
+            labels: node.labels,
+            properties: node.properties                
+        });  
+    }
+
+    async patchNode(id: string, delta: TNodeDelta): Promise<Node | undefined> {
+        const exists = await this.checkNodeExists(id);
+        if (!exists) return;
+        // create query
+        let query = `MATCH (n {_id_:'${id}'}) `;
+        if (delta.labels) {
+            const nodeLabelsStr = stringifyLabels(delta.labels);
+            query += `SET n${nodeLabelsStr} `
+        }
+        if (delta.properties) {
+            const nodePropsStr = stringifyProps(delta.properties);
+            query += `SET n += ${nodePropsStr} `
+        }
+        query += `RETURN n`        
+        // execute query
+        const queryResult = await this.#writeQuery(({
+            text: query
+        }));
+        const raw = queryResult.records?.[0]?.get("n");
+        if (!raw) return;
+        const returnedNode = parseRawNodeData(raw);
+        return new Node({
+            id: returnedNode.properties._id_,
+            labels: returnedNode.labels,
+            properties: returnedNode.properties            
+        });                
+    }
+
+    async readLink(id: string) {
+        const queryResult = await this.#readQuery({
+            text: `MATCH (a)-[r {_id_:'${id}'}]->(b) RETURN *`
+        });
+        // get raw
+        const rawLink = queryResult.records?.[0]?.get("r");
+        const rawSource = queryResult.records?.[0]?.get("a");
+        const rawTarget = queryResult.records?.[0]?.get("b");
+        if (!rawLink || !rawSource || !rawTarget) return;
+        // parse
+        const link = parseRawLinkData(rawLink);
+        const source = parseRawNodeData(rawSource);
+        const target = parseRawNodeData(rawTarget);
+        // create and return link
+        return new Link({
+            id: link.properties._id_,
+            label: link.type,
+            properties: link.properties,
+            source: source.properties._id_,
+            target: target.properties._id_
+        })
+    }
+
+    async setLink(link: { id: string; label: string; properties: Record<string, unknown>; source: string; target: string; }): Promise<Link | undefined> {
+        // cancel if source or target does not exist
+        const sourceNode = await this.readNode(link.source);
+        const targetNode = await this.readNode(link.target);
+        if (!sourceNode || !targetNode) return;
+        // check if link already exists, generate query accordingly
+        const exists = await this.checkLinkExists(link.id);
+        link.properties._id_ = link.id;
+        const linkPropsStr = stringifyProps(link.properties);
+        let query = "";
+        if (exists) {
+            console.debug("replacing old");
+            // if so, update label and props
+            query = `MATCH (a)-[r_old {_id_:'${link.id}'}]->(b) CREATE (a)-[r:${link.label} ${linkPropsStr}]->(b) DELETE r_old RETURN r, a, b`;
+        } else {
+            console.debug("creating new");
+            // create new
+            query = `CREATE (a {_id_:'${sourceNode.id}'})-[r:${link.label} ${linkPropsStr}]->(b {_id_:'${targetNode.id}'}) RETURN r, a, b`
+        }
+        // execute query
+        const queryResult = await this.#writeQuery(({
+            text: query
+        }));
+        const returnedLink = parseRawLinkData(queryResult.records?.[0]?.get("r"));
+        const returnedSourceNode = parseRawNodeData(queryResult.records?.[0]?.get("a"));
+        const returnedTargetNode = parseRawNodeData(queryResult.records?.[0]?.get("b"));
+        return new Link({
+            id: returnedLink.properties._id_,
+            source: returnedSourceNode.properties._id_,
+            target: returnedTargetNode.properties._id_,
+            label: returnedLink.type,
+            properties: returnedLink.properties
+        })
+    }
     
-    async createNode(labels: string[], properties: Record<string, unknown>): Promise<TGraphDatabaseResultSpec<"Node created.", "Could not create node.", Node>> {
-        try {
-            // add id to props
-            const idGenerationResult = await this.generateNodeId();
-            properties._id_ = idGenerationResult.data;
-            // generate and execute query
-            const nodeLabelsStr = stringifyLabels(labels);
-            const nodePropsStr = stringifyProps(properties);
-            const queryResult = await this.#writeQuery({
-                text: `CREATE (n${nodeLabelsStr} ${nodePropsStr}) RETURN n`
-            });
-            const nodesCreated = queryResult.summary.updateStatistics.updates().nodesCreated;
-            if (nodesCreated !== 1) {
-                throw new Error(`invalid 'nodesCreated' count from neo4j driver. Expected 1, got ${nodesCreated}.`)
-            }
-            const node = parseRawNodeData(queryResult.records?.[0]?.get("n"));
-            // return
-            return {
-                success: true,
-                error: false,
-                userFriendlyMessage: "Node created.",
-                data: new Node({
-                    id: node.properties._id_,
-                    labels: node.labels,
-                    properties: node.properties,
-                })
-            }
+    async checkNodeExists(id: string) {
+        const node = await this.readNode(id);
+        return (!!node);
+    }
+
+    async checkLinkExists(id: string) {
+        const link = await this.readLink(id);
+        return (!!link);
+    }
+
+    async generateNodeId(): Promise<string> {
+        let id : string = generateNodeId();
+        let exists = await this.checkNodeExists(id);
+        while (exists) {
+            id = generateNodeId();
         }
-        catch (e) {
-            return createGraphDatabaseErrorResult("Could not create node.", e);
-        }   
+        return id;
     }
 
-    async readNode(id: string, throwError: boolean): Promise<TGraphDatabaseResultSpec<"Node found." | "Node not found.", "Could not read node." | "Could not find node.", Node | undefined>> {
-        try {
-            const queryResult = await this.#readQuery({
-                text: `MATCH (n {_id_:'${id}'}) RETURN n`
-            });
-            const node = parseRawNodeData(queryResult.records?.[0]?.get("n"));
-            return {
-                success: true,
-                error: false,
-                userFriendlyMessage: "Node found.",
-                data: new Node({
-                    id: node.properties._id_,
-                    labels: node.labels,
-                    properties: node.properties
-                })
-            }
-        } catch (e) {
-            if (e === GraphDatabasePort.errors.nodeNotFound && throwError) {
-                return createGraphDatabaseErrorResult("Could not find node.", e);
-            } 
-            else if (e === GraphDatabasePort.errors.nodeNotFound && !throwError) {
-                return {
-                    success: true,
-                    error: false,
-                    userFriendlyMessage: "Node not found.",
-                    data: undefined
-                }
-            }
-            else {
-                return createGraphDatabaseErrorResult("Could not read node.", e);
-            }
-        }        
-    }
-
-    async updateNodeLabels(id: string, labels: string[], mode: "put" | "patch"): Promise<TGraphDatabaseResultSpec<"Node labels updated.", "Could not update node labels.", Node>> {
-        try {
-            let query = `MATCH (n {_id_:'${id}'}) `
-            const nodeLabelsStr = stringifyLabels(labels);
-            // FORM THE QUERY
-            // put
-            if (mode === "put") {
-                // delete existing labels
-                query += `CALL apoc.create.removeLabels(n, labels(n)) YIELD node AS m `;
-                // set new labels
-                query += `SET m${nodeLabelsStr} `
-                // return
-                query += `RETURN m`
-            }
-            // patch
-            else if (mode === "patch") {
-                // set new labels
-                query += `SET n${nodeLabelsStr} `
-                // return
-                query += `RETURN n`
-            }
-            else {
-                throw GraphDatabasePort.errors.unrecognisedArg("mode", mode);
-            }
-            // EXECUTE THE QUERY
-            const queryResult = await this.#writeQuery(({
-                text: query
-            }));
-            const node = parseRawNodeData(queryResult.records?.[0]?.get("n"));
-            // RETURN RESULT
-            return {
-                success: true,
-                error: false,
-                userFriendlyMessage: "Node labels updated.",
-                data: new Node({
-                    id: node.properties._id_,
-                    labels: node.labels,
-                    properties: node.properties
-                })
-            }
-        } catch (e) {
-            return createGraphDatabaseErrorResult("Could not update node labels.", e);
-        }        
-    }
-
-    async updateNodeProperties(id: string, properties: Partial<Omit<{ id: string; labels: string[]; properties: Record<string, unknown>; }, "id">>, mode: "put" | "patch"): Promise<TGraphDatabaseResultSpec<"Node properties updated.", "Could not update node properties.", Node>> {
-        try {
-            let query = `MATCH (n {_id_:'${id}'}) `
-            const nodePropsStr = stringifyProps(properties);
-            // FORM THE QUERY
-            if (mode === "put") {
-                query += `SET n += ${nodePropsStr} `
-            } else {
-                query += `SET n = ${nodePropsStr} `
-            }
-            query += `RETURN n`
-            // EXECUTE THE QUERY
-            const queryResult = await this.#writeQuery({
-                text: `MATCH (n {_id_:'${id}'} SET n${nodePropsStr} RETURN n`
-            });
-            const node = parseRawNodeData(queryResult.records?.[0]?.get("n"));
-            // RETURN RESULT
-            return {
-                success: true,
-                error: false,
-                userFriendlyMessage: "Node properties updated.",
-                data: new Node({
-                    id: node.properties._id_,
-                    labels: node.labels,
-                    properties: node.properties
-                })
-            }
-        } catch (e) {
-            return createGraphDatabaseErrorResult("Could not update node properties.", e);
+    async generateLinkId(): Promise<string> {
+        let id : string = generateLinkId();
+        let exists = await this.checkLinkExists(id);
+        while (exists) {
+            id = generateLinkId();
         }
-    }
-            
-    async deleteNode(id: string): Promise<TGraphDatabaseResultSpec<"Node deleted.", "Could not delete node.", null>> {
-        try {
-            const queryResult = await this.#writeQuery({
-                text: `MATCH (n {_id_:'${id}'}) DELETE n`
-            });
-            const nodesDeleted = queryResult.summary.counters.updates().nodesDeleted;
-            if (nodesDeleted !== 1) {
-                throw new Error(`invalid 'nodesDeleted' count from neo4j driver. Expected 1, got ${nodesDeleted}.`)
-            }
-            return {
-                success: true,
-                error: false,
-                userFriendlyMessage: "Node deleted.",
-                data: null
-            }
-        } catch (e) {
-            return createGraphDatabaseErrorResult("Could not delete node.", e);
-        }
-    }
-
-    async checkIdExists(id: string) {
-        const readResult = await this.readNode(id, false);
-        return (!!readResult.data);
-    }
-
-    async generateNodeId(): Promise<TGraphDatabaseResultSpec<"New Id generated.", "Could not generate new Id.", string>> {
-        try {
-            let id : string = generateNodeId();
-            let exists = await this.checkIdExists(id);
-            while (exists) {
-                id = generateNodeId();
-            }
-            return {
-                success: true,
-                error: false,
-                userFriendlyMessage: "New Id generated.",
-                data: id
-            }
-        } catch (e) {
-            return createGraphDatabaseErrorResult("Could not generate new Id.", e);
-        }
+        return id;
     }
 
     async close() {
