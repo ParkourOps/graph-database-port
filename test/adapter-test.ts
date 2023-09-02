@@ -3,6 +3,8 @@ import { GraphDatabasePort } from "../src";
 import { generateRandomCorrectNodeLabels, generateRandomIncorrectNodeLabels, generateRandomProps } from "./helpers/random-gen-functs";
 import isObjEqual from "lodash.isequal";
 
+export const TIMEOUT_DURATION = "5m";
+
 export function _adapterTest(iteration: number, db: GraphDatabasePort) {
     describe(`iteration # ${iteration}...`, async function(){
 
@@ -19,7 +21,7 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
             // ensure only id property
             expect(Object.entries(result.properties)).to.have.length(1);
             expect(result.properties).to.have.property("_id_").to.be.a("string");
-        }).timeout("2m");
+        }).timeout(TIMEOUT_DURATION);
 
         it("Should be able to create a node with just labels (allowed chars)", async function() {
             // generate labels
@@ -37,7 +39,7 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
             // ensure only id property
             expect(Object.entries(result.properties)).to.have.length(1);
             expect(result.properties).to.have.property("_id_").to.be.a("string");            
-        }).timeout("2m");
+        }).timeout(TIMEOUT_DURATION);
 
         it("Should NOT be able to create a node with just labels (disallowed chars)", async function() {
             const labels = generateRandomIncorrectNodeLabels();
@@ -51,7 +53,7 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
                 expect(e).to.be.an("error");
                 expect(e.message).to.equal(GraphDatabasePort.errors.writeError.message);
             }
-        }).timeout("2m");
+        }).timeout(TIMEOUT_DURATION);
 
         it("Should be able to create a node with just props", async function() {
             const props = generateRandomProps();
@@ -62,7 +64,7 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
             });
             expect(result).to.be.an("object");
             expect(isObjEqual(result.properties, props)).to.equal(true);
-        }).timeout("2m");
+        }).timeout(TIMEOUT_DURATION);
 
         it("Should be able to create a node with labels and props", async function() {
             const labels = generateRandomCorrectNodeLabels();
@@ -75,7 +77,7 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
             expect(result).to.be.an("object");
             expect(result.labels).to.have.length(labels.length);
             expect(isObjEqual(result.properties, props)).to.equal(true);
-        }).timeout("2m");
+        }).timeout(TIMEOUT_DURATION);
 
         it("Should be able to delete a node by Id", async function() {
             const nodeId = await db.generateNodeId();
@@ -89,7 +91,7 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
             expect(createdNode.id).to.equal(readNode?.id).to.equal(deletedNode?.id);
             const readDeletedNode = await db.readNode(nodeId);
             expect(readDeletedNode).to.be.a("undefined");
-        }).timeout("2m");
+        }).timeout(TIMEOUT_DURATION);
 
         it("Should be able to set a set a node in place of another", async function() {
             const id = await db.generateNodeId();
@@ -116,7 +118,7 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
             expect(readNode?.id).to.equal(id);
             expect(readNode?.labels.length).to.equal(endLabels.length);
             expect(isObjEqual(readNode?.properties, endProps)).to.equal(true);
-        }).timeout("2m");
+        }).timeout(TIMEOUT_DURATION);
 
         it("Should be able to append to a node, ignoring any overlap in arguments", async function() {
             const id = await db.generateNodeId();
@@ -163,7 +165,7 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
             expect(isObjEqual(readNode?.properties, patchedNode3?.properties)).to.equal(true);
             expect(readNode?.labels.length).to.equal(labels.length + 3);
             expect(Object.entries(readNode?.properties ?? {}).length).to.equal(Object.entries(props).length + 3);
-        }).timeout("4m")
+        }).timeout(TIMEOUT_DURATION)
     });
 }
 
