@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { SNode, SNodeId } from "./node";
+import consts from "../../consts";
 
-export const SLinkId = z.string().nonempty();
+export const SLinkId = z.string().regex(new RegExp(consts.REGEX_LINK_LABEL));
 export const SLinkLabel = z.string().nonempty();
 export const SLinkProperties = z.record(z.string(), z.unknown());
 
@@ -27,3 +28,7 @@ export type TLinkProperties = z.infer<typeof SLinkProperties>;
 export type TLinkBase = z.infer<typeof SLinkBase>;
 export type TLink = z.infer<typeof SLink>;
 export type TReferencedLink = z.infer<typeof SReferencedLink>;
+export type TLinkDelta = {
+    label?: TLinkLabel,
+    properties?: TLinkProperties
+}
