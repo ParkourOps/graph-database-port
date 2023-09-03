@@ -1,5 +1,5 @@
 {
-  "name": "@parkour-ops/graph-db",
+  "name": "@parkour-ops/graph-db-port",
   "version": "0.1.0",
   "description": "Provisions graph database functionality through a logical port (abstract class, to used as an interface); provisions various adapters to facilitate connection to actual graph database implementations.",
   "main": "./lib/index.js",
@@ -42,5 +42,9 @@
     "neo4j-driver": "^5.11.0",
     "uuid": "^9.0.0",
     "zod": "^3.22.2"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TejAtParkourOps/graph-database-port"
+  }  
 }
