@@ -3,7 +3,7 @@ import consts from "../../src/consts";
 import { generateRandomArray, generateRandomInt } from "../../src/utils/random-gen-functs";
 import {faker} from "@faker-js/faker/locale/en_GB"
 
-const CHARS_ALLOWED_NODE_LABELS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ !#%&*+:;<=>?@-_|~";
+const CHARS_ALLOWED_NODE_LABELS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ !#%&*+<=>?@-_|~";
 
 function generateRandomNodeLabel() {
     return customAlphabet(CHARS_ALLOWED_NODE_LABELS)(generateRandomInt(1, consts.MAX_LEN_NODE_LABEL));
@@ -30,8 +30,8 @@ function generateRandomLenByteArray(incMin: number, incMax: number) {
     return arr;
 }
 
-export const generateRandomCorrectNodeLabels = () => generateRandomArray(0, consts.MAX_NUM_NODE_LABELS, generateRandomNodeLabel);
-export const generateRandomIncorrectNodeLabels = () => generateRandomArray(0, consts.MAX_NUM_NODE_LABELS, generateRandomIncorrectNodeLabel);
+export const generateRandomCorrectNodeLabels = (min: number = 0, max: number = consts.MAX_NUM_NODE_LABELS) => generateRandomArray(min, max, generateRandomNodeLabel);
+export const generateRandomIncorrectNodeLabels = (min: number = 0, max: number = consts.MAX_NUM_NODE_LABELS) => generateRandomArray(min, max, generateRandomIncorrectNodeLabel);
 
 const generateRandomPropArrayVal = <T>(generatorFn: ()=>T) => generateRandomArray(consts.MIN_LEN_PROP_ARRAY_VAL, consts.MAX_LEN_PROP_ARRAY_VAL, generatorFn);
 
