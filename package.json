@@ -4,6 +4,9 @@
   "description": "Provisions graph database functionality through a logical port (abstract class, to used as an interface); provisions various adapters to facilitate connection to actual graph database implementations.",
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
+  "files": [
+    "./lib"
+  ],
   "scripts": {
     "build": "npm run lint && rm -rf ./lib && tsc",
     "test": "npm run lint && mocha -r dotenv/config",
