@@ -1,4 +1,3 @@
-import { TCypherQuery } from "./schema/graph";
 import { TNode, TNodeDelta, TNodeLabels, TNodeProperties } from "./schema/node";
 import { TLink, TLinkDelta, TLinkLabel, TLinkProperties } from "./schema/link";
 import { TGraphDatabaseResultSpec } from "./schema/db-result";
@@ -7,6 +6,11 @@ import { Graph } from "./classes/graph";
 import { Node } from "./classes/node"
 import { TNodeSelector } from "./schema/selectors"
 
+export type TCypherQuery = {
+    text: string,
+    type: "write" | "read"
+};
+
 const errors = {
     "nodeFetchFail": new Error("could not retrieve expected node."),
     "linkFetchFail": new Error("could not retrieve expected link."),
@@ -14,7 +18,8 @@ const errors = {
     "linkParseFail": new Error("failed to parse raw data as link."),
     "connectionClosed": new Error("connection is closed."),
     "writeError": new Error("write error, see log."),
-    "readError": new Error("read error, see log.")
+    "readError": new Error("read error, see log."),
+    "graphParseFail": new Error("could not parse graph.")
 } as const;
 
 export abstract class GraphDatabasePort {
@@ -56,6 +61,8 @@ export abstract class GraphDatabasePort {
 
     // get a fresh, unused id to create a new node
     abstract generateNodeId() : Promise<string>
+    
+    // get a fresh, unused id to create a new link
     abstract generateLinkId() : Promise<string>
 
     // permanently close the connection
