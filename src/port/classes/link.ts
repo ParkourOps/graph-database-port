@@ -1,4 +1,5 @@
-import { TLink } from "../schema/link"
+import { GraphDatabasePort } from ".."
+import { SLink, TLink } from "../schema/link"
 
 export class Link implements TLink {
     source
@@ -7,10 +8,17 @@ export class Link implements TLink {
     label
     properties
     constructor(link: TLink) {
-        this.source = link.source;
-        this.target = link.target;
-        this.id = link.id;
-        this.label = link.label;
-        this.properties = link.properties;
+        const linkParseResult = SLink.safeParse(link);
+        if (linkParseResult.success) {
+            this.source = linkParseResult.data.source;
+            this.target = linkParseResult.data.target;
+            this.id = linkParseResult.data.id;
+            this.label = linkParseResult.data.label;
+            this.properties = linkParseResult.data.properties; 
+        } else {
+            console.error("Failed to parse link:", link);
+            console.error(JSON.stringify(linkParseResult.error));
+            throw GraphDatabasePort.errors.linkParseFail;
+        }
     }
 }
