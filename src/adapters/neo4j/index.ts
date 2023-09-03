@@ -1,5 +1,5 @@
 import { GraphDatabasePort, Node, TCypherQuery } from "../../port"
-import neo4j, { RecordShape, Session, ManagedTransaction, Driver, QueryResult } from "neo4j-driver";
+import neo4j, { RecordShape, Session, Driver, QueryResult } from "neo4j-driver";
 import { TransactionConfig } from "neo4j-driver-core";
 import { SNeo4jLink, SNeo4jNode } from "./schema";
 import { stringifyLabels, stringifyProps } from "../../utils/cypher-string-functs";
@@ -8,8 +8,6 @@ import { TNode, TNodeDelta } from "../../port/schema/node";
 import { Link } from "../../port/classes/link";
 import { TLink, TLinkDelta } from "../../port/schema/link";
 import { Graph } from "../../port/classes/graph";
-
-type ManagedTransactionWork<T> = (tx: ManagedTransaction) => Promise<T> | T;
 
 type Query = {
     text: string,
@@ -62,7 +60,13 @@ function tryParseNode(raw: any) {
 
 function tryParseLink(raw: any, source?: Node, target?: Node) {
     if (!source || !target) {
-        console.error("Failed to parse link (source and/or target node not available):", raw);
+        if (raw) { // only show message if raw link data is present
+            console.error("Failed to parse link (source and/or target node not available):", {
+                link: raw,
+                source,
+                target
+            });
+        }
         return;
     }
     try {
@@ -335,8 +339,8 @@ export class Neo4jAdapter extends GraphDatabasePort {
             text: `MATCH (n) OPTIONAL MATCH (n)-[r]->(m) RETURN n, r, m`,
             type: "read"
         };
-        let nodes : TNode[] = [];
-        let links : TLink[] = [];
+        const nodes : TNode[] = [];
+        const links : TLink[] = [];
         let result : QueryResult<RecordShape> | undefined = undefined;
         if (q.type === "read") {
             result = await this.#readQuery({text:q.text});
@@ -375,7 +379,7 @@ export class Neo4jAdapter extends GraphDatabasePort {
 
     async generateNodeId(): Promise<string> {
         let id : string = generateNodeId();
-        let exists = await this.checkNodeExists(id);
+        const exists = await this.checkNodeExists(id);
         while (exists) {
             id = generateNodeId();
         }
@@ -384,7 +388,7 @@ export class Neo4jAdapter extends GraphDatabasePort {
 
     async generateLinkId(): Promise<string> {
         let id : string = generateLinkId();
-        let exists = await this.checkLinkExists(id);
+        const exists = await this.checkLinkExists(id);
         while (exists) {
             id = generateLinkId();
         }
