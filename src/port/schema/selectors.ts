@@ -1,4 +1,4 @@
-import {TNode, TNodeDelta as TNodeMatcher, TNodeLabels, TNodeProperties} from "./node";
+import {TNode, TNodeDelta as TNodeMatcher} from "./node";
 
 export type TNodeSelector = 
     string |        // single node by id 

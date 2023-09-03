@@ -1,10 +1,8 @@
-import { TNode, TNodeDelta, TNodeLabels, TNodeProperties } from "./schema/node";
-import { TLink, TLinkDelta, TLinkLabel, TLinkProperties } from "./schema/link";
-import { TGraphDatabaseResultSpec } from "./schema/db-result";
+import { TNode, TNodeDelta } from "./schema/node";
+import { TLink, TLinkDelta } from "./schema/link";
 import { Link } from "./classes/link";
 import { Graph } from "./classes/graph";
 import { Node } from "./classes/node"
-import { TNodeSelector } from "./schema/selectors"
 
 export type TCypherQuery = {
     text: string,

@@ -14,8 +14,8 @@ export class GraphLink implements TReferencedLink {
         this.id = link.id;
         this.label = link.label;
         this.properties = link.properties;
-        let source = graph.nodes.find((n)=>n.id === link.source);
-        let target = graph.nodes.find((n)=>n.id === link.target);
+        const source = graph.nodes.find((n)=>n.id === link.source);
+        const target = graph.nodes.find((n)=>n.id === link.target);
         if (!source || !target) {
             throw GraphDatabasePort.errors.graphParseFail;
         }
