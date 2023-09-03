@@ -45,20 +45,22 @@ function parseRawLinkData(l?: unknown) {
 }
 
 function tryParseNode(raw: any) {
-    try{
+    if (!raw) return;
+    // try{
         return new Node({
             id: raw.properties._id_,
             labels: raw.labels,
             properties: raw.properties
         });
-    }
-    catch (e) {
-        /* do nothing, already handled */
-        return;
-    }
+    // }
+    // catch (e) {
+    //     /* suppress any errors */
+    //     return;
+    // }
 }
 
 function tryParseLink(raw: any, source?: Node, target?: Node) {
+    if (!raw) return;
     if (!source || !target) {
         if (raw) { // only show message if raw link data is present
             console.error("Failed to parse link (source and/or target node not available):", {
@@ -69,7 +71,7 @@ function tryParseLink(raw: any, source?: Node, target?: Node) {
         }
         return;
     }
-    try {
+    // try {
         return new Link({
             id: raw.properties._id_,
             label: raw.type,
@@ -77,10 +79,10 @@ function tryParseLink(raw: any, source?: Node, target?: Node) {
             source: source.id,
             target: target.id
         })
-    } catch (e) {
-        /* do nothing, already handled */
-        return;
-    }
+    // } catch (e) {
+    //     /* suppress any errors */
+    //     return;
+    // }
 }
 
 export class Neo4jAdapter extends GraphDatabasePort {
