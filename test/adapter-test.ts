@@ -2,8 +2,9 @@ import {assert, expect} from "chai"
 import { GraphDatabasePort } from "../src";
 import { generateRandomCorrectNodeLabels, generateRandomIncorrectNodeLabels, generateRandomProps } from "./helpers/random-gen-functs";
 import isObjEqual from "lodash.isequal";
+import consts from "../src/consts";
 
-export const TIMEOUT_DURATION = "5m";
+export const TIMEOUT_DURATION = consts.TEST_FUNCT_TIMEOUT_DURATION;
 
 export function _adapterTest(iteration: number, db: GraphDatabasePort) {
     describe(`iteration # ${iteration}...`, async function(){
@@ -95,7 +96,7 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
             expect(readDeletedNode).to.be.a("undefined");
         }).timeout(TIMEOUT_DURATION);
 
-        it("Should be able to set a set a node in place of another", async function() {
+        it("Should be able to set a node in place of another", async function() {
             const id = await db.generateNodeId();
             const startLabels = generateRandomCorrectNodeLabels();
             const startProps = generateRandomProps();
@@ -125,7 +126,7 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
 
         it("Should be able to append to a node, ignoring any overlap in arguments", async function() {
             const id = await db.generateNodeId();
-            const labels = generateRandomCorrectNodeLabels();
+            const labels = generateRandomCorrectNodeLabels(0, consts.MAX_NUM_NODE_LABELS-3);
             const props = generateRandomProps();
 
             const createdNode = await db.setNode({
@@ -168,8 +169,6 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
             
             const readNode = await db.readNode(id);
             if (!readNode) assert.fail();
-            // console.debug("patched:", patchedNode3);
-            // console.debug("read:", readNode);
             expect(isObjEqual(readNode.properties, patchedNode3.properties)).to.equal(true);
             expect(readNode.labels.length).to.equal(labels.length + 3);
             expect(Object.entries(readNode.properties).length).to.equal(Object.entries(props).length + 3);
@@ -326,6 +325,12 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
             expect(readLinkAfter.label).to.equal("ABC_XYZ");
             expect(readLinkAfter.properties).to.have.property("favourite_condiment");
             expect(readLinkAfter.properties.favourite_condiment).to.equal("balsamic vinegar");            
+        }).timeout(TIMEOUT_DURATION);
+
+        it("Should be able to fetch all nodes and links when graph is queried (no args)", async function() {
+            const graph = await db.queryGraph();
+            expect(graph.nodes.length).to.be.greaterThan(0);
+            expect(graph.links.length).to.be.greaterThan(0);
         }).timeout(TIMEOUT_DURATION);
     });
 }
