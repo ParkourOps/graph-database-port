@@ -8,7 +8,7 @@ import { TNodeLabels, TNodeProperties } from "../port/schema/node";
  * @return {string} -
  *          Cypher string representation of the properties object.
  */
-export const stringifyProps = <T extends object>(properties?: TNodeProperties) => {
+export const stringifyProps = (properties?: TNodeProperties) => {
     if (!properties) return "{}";
     return JSON.stringify(properties).replace(/"([^"]+)":/g, "$1:");
 };
