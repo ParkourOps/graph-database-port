@@ -329,6 +329,10 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
 
         it("Should be able to fetch all nodes and links when graph is queried (no args)", async function() {
             const graph = await db.queryGraph();
+            // console.debug("NODES");
+            // console.debug(graph.nodes);
+            // console.debug("LINKS");
+            // console.debug(graph.links);
             expect(graph.nodes.length).to.be.greaterThan(0);
             expect(graph.links.length).to.be.greaterThan(0);
         }).timeout(TIMEOUT_DURATION);
