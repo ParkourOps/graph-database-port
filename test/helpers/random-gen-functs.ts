@@ -10,25 +10,25 @@ function generateRandomNodeLabel() {
 }
 
 function generateRandomIncorrectNodeLabel() {
-    return customAlphabet(CHARS_ALLOWED_NODE_LABELS+"\'\"\`\$")(generateRandomInt(1, consts.MAX_LEN_NODE_LABEL));
+    return customAlphabet(CHARS_ALLOWED_NODE_LABELS+`'"$\``)(generateRandomInt(1, consts.MAX_LEN_NODE_LABEL));
 }
 
-function generateRandomInt8() {
-    // Generate a random number between -128 and 127
-    const min = -128;
-    const max = 127;
-    const randomNumber = Math.floor(Math.random() * (max - min + 1)) + min;
-    return randomNumber;
-}
+// function generateRandomInt8() {
+//     // Generate a random number between -128 and 127
+//     const min = -128;
+//     const max = 127;
+//     const randomNumber = Math.floor(Math.random() * (max - min + 1)) + min;
+//     return randomNumber;
+// }
 
-function generateRandomLenByteArray(incMin: number, incMax: number) {
-    const len = generateRandomInt(incMin, incMax);
-    const arr = new Int8Array(len);
-    for (let i=0; i<len; ++i) {
-        arr[i] = generateRandomInt8();
-    }
-    return arr;
-}
+// function generateRandomLenByteArray(incMin: number, incMax: number) {
+//     const len = generateRandomInt(incMin, incMax);
+//     const arr = new Int8Array(len);
+//     for (let i=0; i<len; ++i) {
+//         arr[i] = generateRandomInt8();
+//     }
+//     return arr;
+// }
 
 export const generateRandomCorrectNodeLabels = (min: number = 0, max: number = consts.MAX_NUM_NODE_LABELS) => generateRandomArray(min, max, generateRandomNodeLabel);
 export const generateRandomIncorrectNodeLabels = (min: number = 0, max: number = consts.MAX_NUM_NODE_LABELS) => generateRandomArray(min, max, generateRandomIncorrectNodeLabel);

@@ -103,13 +103,13 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
             const endLabels = generateRandomCorrectNodeLabels();
             const endProps = generateRandomProps();
 
-            const createdNode = await db.setNode({
+            await db.setNode({
                 id,
                 labels: startLabels,
                 properties: startProps
             });
 
-            const recreatedNode = await db.setNode({
+            await db.setNode({
                 id,
                 labels: endLabels,
                 properties: endProps
@@ -129,7 +129,7 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
             const labels = generateRandomCorrectNodeLabels(0, consts.MAX_NUM_NODE_LABELS-3);
             const props = generateRandomProps();
 
-            const createdNode = await db.setNode({
+            await db.setNode({
                 id,
                 labels: labels,
                 properties: props
@@ -342,6 +342,6 @@ export function adapterTest(db: GraphDatabasePort, repeat: number = 1) {
     describe(`Repeating test ${repeat} times for ${db.name} adapter...`, function() {
         for (let i=0; i<repeat; ++i) {
             _adapterTest(i+1, db);
-        };
+        }
     });
 }
