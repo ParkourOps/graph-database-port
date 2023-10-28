@@ -2,8 +2,8 @@ import { z } from "zod";
 import { SNode, SNodeId } from "./node";
 import consts from "../../consts";
 
-export const SLinkId = z.string().regex(new RegExp(consts.REGEX_LINK_LABEL));
-export const SLinkLabel = z.string().nonempty();
+export const SLinkId = z.string().nonempty();
+export const SLinkLabel = z.string().regex(new RegExp(consts.REGEX_LINK_LABEL));
 export const SLinkProperties = z.record(z.string(), z.unknown());
 
 const SLinkBase = z.object({
