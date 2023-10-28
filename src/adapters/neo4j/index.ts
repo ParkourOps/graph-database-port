@@ -1,6 +1,6 @@
 import { GraphDatabasePort, Node, TCypherQuery } from "../../port"
 import neo4j, { RecordShape, Session, Driver, QueryResult } from "neo4j-driver";
-import { TransactionConfig } from "neo4j-driver-core";
+import { TransactionConfig, Node as Neo4jNode, Relationship as Neo4jLink } from "neo4j-driver-core";
 import { SNeo4jLink, SNeo4jNode } from "./schema";
 import { stringifyLabels, stringifyProps } from "../../utils/cypher-string-functs";
 import {generateNodeId, generateLinkId} from "../../utils/random-gen-functs"
@@ -62,13 +62,11 @@ function tryParseNode(raw: any) {
 function tryParseLink(raw: any, source?: Node, target?: Node) {
     if (!raw) return;
     if (!source || !target) {
-        if (raw) { // only show message if raw link data is present
-            console.error("Failed to parse link (source and/or target node not available):", {
-                link: raw,
-                source,
-                target
-            });
-        }
+        console.error("Failed to parse link (source and/or target node not available):", {
+            link: raw,
+            source,
+            target
+        });
         return;
     }
     // try {
@@ -257,16 +255,16 @@ export class Neo4jAdapter extends GraphDatabasePort {
         const targetNode = await this.readNode(link.target);
         if (!sourceNode || !targetNode) return;
         // check if link already exists, generate query accordingly
-        const exists = await this.checkLinkExists(link.id);
+        const linkExists = await this.checkLinkExists(link.id);
         link.properties._id_ = link.id;
         const linkPropsStr = stringifyProps(link.properties);
         let query = "";
-        if (exists) {
+        if (linkExists) {
             // if so, update label and props
             query = `MATCH (a)-[r_old {_id_:'${link.id}'}]->(b) CREATE (a)-[r:${link.label} ${linkPropsStr}]->(b) DELETE r_old RETURN r, a, b`;
         } else {
             // create new
-            query = `CREATE (a {_id_:'${sourceNode.id}'})-[r:${link.label} ${linkPropsStr}]->(b {_id_:'${targetNode.id}'}) RETURN r, a, b`
+            query = `MATCH (a {_id_:'${sourceNode.id}'}) MATCH (b {_id_:'${targetNode.id}'}) CREATE (a)-[r:${link.label} ${linkPropsStr}]->(b) RETURN r, a, b`
         }
         // execute query
         const queryResult = await this.#writeQuery(({
@@ -336,8 +334,8 @@ export class Neo4jAdapter extends GraphDatabasePort {
         });
     }
 
-    async queryGraph(query?: TCypherQuery | undefined): Promise<Graph> {
-        const q = query ?? {
+    async readGraph(): Promise<Graph> {
+        const q = {
             text: `MATCH (n) OPTIONAL MATCH (n)-[r]->(m) RETURN n, r, m`,
             type: "read"
         };
@@ -345,9 +343,9 @@ export class Neo4jAdapter extends GraphDatabasePort {
         const links : TLink[] = [];
         let result : QueryResult<RecordShape> | undefined = undefined;
         if (q.type === "read") {
-            result = await this.#readQuery({text:q.text});
+            result = await this.#readQuery({text: q.text});
         } else {
-            result = await this.#writeQuery({text:q.text});
+            result = await this.#writeQuery({text: q.text});
         }
         result.records.forEach((record)=>{
             const rawSourceNode = record.get("n");
@@ -365,6 +363,49 @@ export class Neo4jAdapter extends GraphDatabasePort {
             if (link) {
                 links.push(link);
             }
+        });
+        return new Graph(this, nodes, links);
+    }
+
+    async clearGraph(): Promise<undefined> {
+        await this.#writeQuery({
+            text: `match (n) optional match ()-[r]-() delete r, n`
+        });
+    }
+
+    async queryGraph(query: TCypherQuery): Promise<Graph> {
+        const nodes : TNode[] = [];
+        const links : TLink[] = [];
+        let result : QueryResult<RecordShape> | undefined = undefined;
+        if (query.type === "read") {
+            result = await this.#readQuery({text: query.text});
+        } else {
+            result = await this.#writeQuery({text: query.text});
+        }
+        // parse nodes and links for each path (record)
+        result.records.forEach((record)=>{
+            const _record : any[] = Array.from(record.values());
+            _record.forEach((item)=>{
+                // if node
+                if (item instanceof Neo4jNode) { // item.labels && Array.isArray(item.labels)
+                    const node = tryParseNode(item);
+                    if (node) {
+                        nodes.push(node);
+                    }
+                }
+                // if link
+                if (item instanceof Neo4jLink) { // item.type && typeof item.type === "string"
+                    const rawSourceNode = _record.find((i) => i.elementId === item.startNodeElementId);
+                    const rawTargetNode = _record.find((i) => i.elementId === item.endNodeElementId);
+                    const sourceNode = tryParseNode(rawSourceNode);
+                    const targetNode = tryParseNode(rawTargetNode);
+                    if (!sourceNode || !targetNode) return;
+                    const link = tryParseLink(item, sourceNode, targetNode);
+                    if (link) {
+                        links.push(link);
+                    }
+                }
+            })
         });
         return new Graph(this, nodes, links);
     }

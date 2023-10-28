@@ -3,6 +3,7 @@ import { GraphDatabasePort } from "../src";
 import { generateRandomCorrectNodeLabels, generateRandomIncorrectNodeLabels, generateRandomProps } from "./helpers/random-gen-functs";
 import isObjEqual from "lodash.isequal";
 import consts from "../src/consts";
+import { faker } from "@faker-js/faker";
 
 export const TIMEOUT_DURATION = consts.TEST_FUNCT_TIMEOUT_DURATION;
 
@@ -328,7 +329,7 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
         }).timeout(TIMEOUT_DURATION);
 
         it("Should be able to fetch all nodes and links when graph is queried (no args)", async function() {
-            const graph = await db.queryGraph();
+            const graph = await db.readGraph();
             // console.debug("NODES");
             // console.debug(graph.nodes);
             // console.debug("LINKS");
@@ -336,6 +337,67 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
             expect(graph.nodes.length).to.be.greaterThan(0);
             expect(graph.links.length).to.be.greaterThan(0);
         }).timeout(TIMEOUT_DURATION);
+
+        it("Should be able to fetch select nodes and links when graph is queried", async function() {
+            await db.clearGraph();
+
+            const auth1 = await db.setNode({
+                id: await db.generateNodeId(),
+                labels: ["author"],
+                properties: {
+                    name: faker.person.fullName()
+                }
+            });
+            await db.setNode({
+                id: await db.generateNodeId(),
+                labels: ["author"],
+                properties: {
+                    name: faker.person.fullName()
+                }
+            });
+            const bk = await db.setNode({
+                id: await db.generateNodeId(),
+                labels: ["book"],
+                properties: {
+                    title: "Some random title..."
+                }
+            });
+            const publ = await db.setNode({
+                id: await db.generateNodeId(),
+                labels: ["publisher"],
+                properties: {
+                    company: "The Press"
+                }
+            });
+            await db.setLink({
+                id: await db.generateLinkId(),
+                label: "published",
+                properties: {},
+                source: publ.id,
+                target: bk.id
+            });
+            await db.setLink({
+                id: await db.generateLinkId(),
+                label: "wrote",
+                properties: {},
+                source: auth1.id,
+                target: bk.id
+            })
+            
+            const graph = await db.queryGraph(
+                {
+                    type: "read",
+                    text: `match (a:author)-[x]->(b:book)<-[y]-(p:publisher) return *`
+                }
+            );
+            // console.debug("NODES");
+            // console.debug(graph.nodes);
+            // console.debug("LINKS");
+            // console.debug(graph.links);
+            expect(graph.nodes.length).to.be.greaterThan(0);
+            expect(graph.links.length).to.be.greaterThan(0);
+        }).timeout(TIMEOUT_DURATION);   
+
     });
 }
 

@@ -9,6 +9,16 @@ export type TCypherQuery = {
     type: "write" | "read"
 };
 
+export type TParseInstruction = {
+    links: {
+        [key: string]: {
+            sourceNodeKey: string,
+            targetNodeKey: string
+        }
+    },
+    nodes: Array<{key: string}>
+}
+
 const errors = {
     "nodeFetchFail": new Error("could not retrieve expected node."),
     "linkFetchFail": new Error("could not retrieve expected link."),
@@ -17,7 +27,7 @@ const errors = {
     "connectionClosed": new Error("connection is closed."),
     "writeError": new Error("write error, see log."),
     "readError": new Error("read error, see log."),
-    "graphParseFail": new Error("could not parse graph.")
+    "graphLinkParseFail": new Error("could not parse link in graph.")
 } as const;
 
 export abstract class GraphDatabasePort {
@@ -52,7 +62,9 @@ export abstract class GraphDatabasePort {
     abstract deleteLink(id: string): Promise<Link | undefined>
     // abstract deleteLinks(selector: TLinkSelector): Promise<Link[]>
 
-    abstract queryGraph(query?: TCypherQuery): Promise<Graph>
+    abstract readGraph(): Promise<Graph>
+    abstract clearGraph(): Promise<undefined>
+    abstract queryGraph(query: TCypherQuery): Promise<Graph>
 
     abstract checkNodeExists(id: string) : Promise<boolean>
     abstract checkLinkExists(id: string) : Promise<boolean>
