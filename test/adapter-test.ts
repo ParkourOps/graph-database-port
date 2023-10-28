@@ -339,7 +339,7 @@ export function _adapterTest(iteration: number, db: GraphDatabasePort) {
     });
 }
 
-export function adapterTest(db: GraphDatabasePort, repeat: number = 1) {
+export function adapterTest(db: GraphDatabasePort, repeat: number = 10) {
     after(async function(){
         await db.close();
     })
