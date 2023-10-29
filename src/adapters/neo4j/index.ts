@@ -254,18 +254,26 @@ export class Neo4jAdapter extends GraphDatabasePort {
         const sourceNode = await this.readNode(link.source);
         const targetNode = await this.readNode(link.target);
         if (!sourceNode || !targetNode) return;
+        
+        // extract node labels - required to match the nodes
+        // const labelsSourceNode = stringifyLabels(sourceNode.labels);
+        // const labelsTargetNode = stringifyLabels(targetNode.labels);
+
         // check if link already exists, generate query accordingly
         const linkExists = await this.checkLinkExists(link.id);
         link.properties._id_ = link.id;
         const linkPropsStr = stringifyProps(link.properties);
+        
         let query = "";
         if (linkExists) {
             // if so, update label and props
-            query = `MATCH (a)-[r_old {_id_:'${link.id}'}]->(b) CREATE (a)-[r:${link.label} ${linkPropsStr}]->(b) DELETE r_old RETURN r, a, b`;
+            query = `MATCH (a)-[r_old {_id_:'${link.id}'}]->(b) CREATE (a)-[r:${link.label} ${linkPropsStr}]->(b) DELETE r_old RETURN a, r, b`;
         } else {
             // create new
-            query = `MATCH (a {_id_:'${sourceNode.id}'}), (b {_id_:'${targetNode.id}'}) CREATE (a)-[r:${link.label} ${linkPropsStr}]->(b) RETURN r, a, b`
+            // query = `MATCH (a${labelsSourceNode} {_id_:"${sourceNode.id}"}), (b${labelsTargetNode} {_id_:"${targetNode.id}"}) CREATE (a)-[r:${link.label} ${linkPropsStr}]->(b) RETURN a, r, b`;
+            query = `MATCH (a {_id_:"${sourceNode.id}"}), (b {_id_:"${targetNode.id}"}) CREATE (a)-[r:${link.label} ${linkPropsStr}]->(b) RETURN a, r, b`;
         }
+
         // execute query
         const queryResult = await this.#writeQuery(({
             text: query
@@ -273,6 +281,7 @@ export class Neo4jAdapter extends GraphDatabasePort {
         const returnedLink = parseRawLinkData(queryResult.records?.[0]?.get("r"));
         const returnedSourceNode = parseRawNodeData(queryResult.records?.[0]?.get("a"));
         const returnedTargetNode = parseRawNodeData(queryResult.records?.[0]?.get("b"));
+
         return new Link({
             id: returnedLink.properties._id_,
             source: returnedSourceNode.properties._id_,
@@ -354,13 +363,13 @@ export class Neo4jAdapter extends GraphDatabasePort {
             const sourceNode = tryParseNode(rawSourceNode);
             const targetNode = tryParseNode(rawTargetNode);
             const link = tryParseLink(rawLink, sourceNode, targetNode);
-            if (sourceNode) {
+            if (sourceNode && !nodes.find(n => n.id === sourceNode.id)) {
                 nodes.push(sourceNode);
             }
-            if (targetNode) {
+            if (targetNode && !nodes.find(n => n.id === targetNode.id)) {
                 nodes.push(targetNode);
             }
-            if (link) {
+            if (link && !links.find(l => l.id === rawLink.id)) {
                 links.push(link);
             }
         });
