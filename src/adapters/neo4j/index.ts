@@ -264,7 +264,7 @@ export class Neo4jAdapter extends GraphDatabasePort {
             query = `MATCH (a)-[r_old {_id_:'${link.id}'}]->(b) CREATE (a)-[r:${link.label} ${linkPropsStr}]->(b) DELETE r_old RETURN r, a, b`;
         } else {
             // create new
-            query = `MATCH (a {_id_:'${sourceNode.id}'}) MATCH (b {_id_:'${targetNode.id}'}) CREATE (a)-[r:${link.label} ${linkPropsStr}]->(b) RETURN r, a, b`
+            query = `MATCH (a {_id_:'${sourceNode.id}'}), (b {_id_:'${targetNode.id}'}) CREATE (a)-[r:${link.label} ${linkPropsStr}]->(b) RETURN r, a, b`
         }
         // execute query
         const queryResult = await this.#writeQuery(({

@@ -1,6 +1,6 @@
 {
   "name": "@parkour-ops/graph-db-port",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Provisions graph database functionality through a logical port (abstract class, to used as an interface); provisions various adapters to facilitate connection to actual graph database implementations.",
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
