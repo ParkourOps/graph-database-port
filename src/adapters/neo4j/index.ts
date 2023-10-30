@@ -246,7 +246,7 @@ export class Neo4jAdapter extends GraphDatabasePort {
             properties: link.properties,
             source: source.properties._id_,
             target: target.properties._id_
-        })
+        });
     }
 
     async setLink(link: { id: string; label: string; properties: Record<string, unknown>; source: string; target: string; }): Promise<Link | undefined> {
@@ -256,8 +256,8 @@ export class Neo4jAdapter extends GraphDatabasePort {
         if (!sourceNode || !targetNode) return;
         
         // extract node labels - required to match the nodes
-        // const labelsSourceNode = stringifyLabels(sourceNode.labels);
-        // const labelsTargetNode = stringifyLabels(targetNode.labels);
+        const labelsSourceNode = stringifyLabels(sourceNode.labels);
+        const labelsTargetNode = stringifyLabels(targetNode.labels);
 
         // check if link already exists, generate query accordingly
         const linkExists = await this.checkLinkExists(link.id);
@@ -270,8 +270,8 @@ export class Neo4jAdapter extends GraphDatabasePort {
             query = `MATCH (a)-[r_old {_id_:'${link.id}'}]->(b) CREATE (a)-[r:${link.label} ${linkPropsStr}]->(b) DELETE r_old RETURN a, r, b`;
         } else {
             // create new
-            // query = `MATCH (a${labelsSourceNode} {_id_:"${sourceNode.id}"}), (b${labelsTargetNode} {_id_:"${targetNode.id}"}) CREATE (a)-[r:${link.label} ${linkPropsStr}]->(b) RETURN a, r, b`;
-            query = `MATCH (a {_id_:"${sourceNode.id}"}), (b {_id_:"${targetNode.id}"}) CREATE (a)-[r:${link.label} ${linkPropsStr}]->(b) RETURN a, r, b`;
+            query = `MATCH (a${labelsSourceNode} {_id_:"${sourceNode.id}"}), (b${labelsTargetNode} {_id_:"${targetNode.id}"}) CREATE (a)-[r:${link.label} ${linkPropsStr}]->(b) RETURN a, r, b`;
+            // query = `MATCH (a {_id_:"${sourceNode.id}"}), (b {_id_:"${targetNode.id}"}) CREATE (a)-[r:${link.label} ${linkPropsStr}]->(b) RETURN a, r, b`;
         }
 
         // execute query
